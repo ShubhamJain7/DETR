@@ -1,5 +1,10 @@
 #include <iostream>
 #include <onnxruntime_cxx_api.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
+using namespace cv;
 
 int main()
 {
@@ -16,4 +21,8 @@ int main()
     Ort::Session session(env, model_path, session_options);
 
     std::cout << "Session:" << session << "\n";
+
+    Mat image;
+    image = imread("C:/Users/dell/source/repos/DETR/test.jpg", IMREAD_COLOR);
+    
 }
