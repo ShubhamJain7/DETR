@@ -18,6 +18,7 @@ int main()
         return -1;
     }
 
+    image.convertTo(image, CV_32FC3);
     // Change image format from BGR to RGB
     cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
     cv::Mat image_resized;
@@ -25,9 +26,22 @@ int main()
     cv::resize(image, image_resized, Size(256, 256));
 
     cv::Mat image_float;
-    // Normalize image (values between 0-1)
+    //Normalize image (values between 0-1)
     image_resized.convertTo(image_float, CV_32FC3, 1.0f / 255.0f);
-    //TODO: Normazile image channels with mean and std-dev
+
+    std::vector<cv::Mat> channels(3);
+    cv::split(image_float, channels);
+
+    std::vector<double> mean = { 0.485, 0.456, 0.406 };
+    std::vector<double> stddev = { 0.229, 0.224, 0.225 };
+    size_t i = 0;
+    for (auto& c : channels) {
+        c = (c - mean[i]) - stddev[i];
+        ++i;
+    }
+
+    cv::Mat image_normalized;
+    cv::merge(channels, image_normalized);
 
     // create ONNX env and sessionOptions objects
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "test");
@@ -56,7 +70,7 @@ int main()
     // create input tensor
     auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
     size_t input_tensor_size = 256 * 256 * 3;
-    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, reinterpret_cast<float*>(image_float.data), input_tensor_size, input_node_dims.data(), 4);
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, reinterpret_cast<float*>(image_normalized.data), input_tensor_size, input_node_dims.data(), 4);
 
     // pass inputs through model and get output
     auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_names, &input_tensor, 1, output_names, 2);
