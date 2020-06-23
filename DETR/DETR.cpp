@@ -4,6 +4,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+using namespace std;
 using namespace cv;
 
 int main()
@@ -14,34 +15,40 @@ int main()
     // If image is an empty matrix
     if (!image.data)
     {
-        std::cout << "Could not open or find the image" << std::endl;
+        cout << "Could not open or find the image" << std::endl;
         return -1;
     }
 
+    // Convert image values from int to float
     image.convertTo(image, CV_32FC3);
     // Change image format from BGR to RGB
-    cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
-    cv::Mat image_resized;
+    cvtColor(image, image, COLOR_BGR2RGB);
+
+    Mat image_resized;
     // Resize image to (256x256) to fit model input dimensions
-    cv::resize(image, image_resized, Size(256, 256));
+    resize(image, image_resized, Size(256, 256));
+    
+    // Normalize image (values between 0-1)
+    Mat image_float;
+    image_resized.convertTo(image_float, CV_32FC3, 1.0f / 255.0f, 0);
 
-    cv::Mat image_float;
-    //Normalize image (values between 0-1)
-    image_resized.convertTo(image_float, CV_32FC3, 1.0f / 255.0f);
+    // Split image channels
+    vector<cv::Mat> channels(3);
+    split(image_float, channels);
 
-    std::vector<cv::Mat> channels(3);
-    cv::split(image_float, channels);
-
-    std::vector<double> mean = { 0.485, 0.456, 0.406 };
-    std::vector<double> stddev = { 0.229, 0.224, 0.225 };
+    // Define mean and std-dev for each channel
+    vector<double> mean = { 0.485, 0.456, 0.406 };
+    vector<double> stddev = { 0.229, 0.224, 0.225 };
     size_t i = 0;
+    // Normalize each channel with corresponding mean and std-dev values
     for (auto& c : channels) {
-        c = (c - mean[i]) - stddev[i];
+        c = (c - mean[i]) / stddev[i];
         ++i;
     }
 
-    cv::Mat image_normalized;
-    cv::merge(channels, image_normalized);
+    // Concatenate channels to change format from HWC to CHW
+    Mat image_normalized;
+    vconcat(channels, image_normalized);
 
     // create ONNX env and sessionOptions objects
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "test");
@@ -61,10 +68,10 @@ int main()
     static const char* input_names[] = { "image" };
     static const char* output_names[] = { "probs", "boxes" };
 
-    // get input node infor
+    // get input node info
     Ort::TypeInfo type_info = session.GetInputTypeInfo(0);
     auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
-    std::vector<int64_t> input_node_dims;
+    vector<int64_t> input_node_dims;
     input_node_dims = tensor_info.GetShape();
 
     // create input tensor
