@@ -3,6 +3,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <math.h>
 
 using namespace std;
 using namespace cv;
@@ -82,5 +83,75 @@ int main()
     // pass inputs through model and get output
     auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_names, &input_tensor, 1, output_names, 2);
 
-    //TODO: Process outputs
+    auto scores = output_tensors[0].GetTensorMutableData<float>();
+    auto typeInfo = output_tensors[0].GetTensorTypeAndShapeInfo();
+    size_t len = typeInfo.GetElementCount();
+
+    float probs[100][92];
+    size_t index = 0;
+    while (index < len) {
+        for (int i = 0; i < 100; i++) {
+            //cout << "[";
+            for (int j = 0; j < 92; j++) {
+                probs[i][j] = scores[index];
+                //cout << probs[i][j] << ",";
+                ++index;
+            }
+            //cout << "]\n";
+        }
+    }
+
+    float denominator[100];
+    for (size_t i = 0; i < 100; i++)
+    {
+        float val = 0;
+        for (size_t j = 0; j < 92; j++)
+        {
+            val += exp(probs[i][j]);
+        }
+        denominator[i] = val;
+    }
+
+    float softs[100][92];
+    for (size_t i = 0; i < 100; i++)
+    {
+        //cout << "[";
+        for (size_t j = 0; j < 92; j++)
+        {
+            softs[i][j] = exp(probs[i][j])/denominator[i];
+            //cout << softs[i][j] << ",";
+        }
+        //cout << "]," << endl;
+    }
+
+    float req[100][91];
+    //cout << "[";
+    for (size_t i = 0; i < 100; i++)
+    {
+        //cout << "[";
+        for (size_t j = 0; j < 91; j++)
+        {
+            req[i][j] = softs[i][j];
+            if (i == 20) {
+                //cout << req[i][j] << ",";
+            }
+        }
+        //cout << "]," << endl;
+    }
+    //cout << "]";
+    cout << "[";
+    for (size_t i = 0; i < 100; i++)
+    {
+        float max = 0;
+        int index = -1;
+        for (size_t j = 0; j < 91; j++)
+        {
+            if (req[i][j] >= max) {
+                max = req[i][j];
+                index = j;
+            }
+        }
+        cout <<  index << ",";
+    }
+    cout << "]";
 }
