@@ -84,74 +84,46 @@ int main()
     auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_names, &input_tensor, 1, output_names, 2);
 
     auto scores = output_tensors[0].GetTensorMutableData<float>();
+
+    // Get length of output
     auto typeInfo = output_tensors[0].GetTensorTypeAndShapeInfo();
     size_t len = typeInfo.GetElementCount();
 
+    // store outputs in a 2d array for easier access and processing
+    // calculate and store sum of exponents for each row to be used as denominator for apploying the softmax function
     float probs[100][92];
     size_t index = 0;
+    float denominator[100];
     while (index < len) {
         for (int i = 0; i < 100; i++) {
-            //cout << "[";
+            float val = 0;
             for (int j = 0; j < 92; j++) {
                 probs[i][j] = scores[index];
-                //cout << probs[i][j] << ",";
+                val += exp(probs[i][j]);
                 ++index;
             }
-            //cout << "]\n";
+            denominator[i] = val;
         }
     }
-
-    float denominator[100];
-    for (size_t i = 0; i < 100; i++)
-    {
-        float val = 0;
-        for (size_t j = 0; j < 92; j++)
-        {
-            val += exp(probs[i][j]);
-        }
-        denominator[i] = val;
-    }
-
-    float softs[100][92];
-    for (size_t i = 0; i < 100; i++)
-    {
-        //cout << "[";
-        for (size_t j = 0; j < 92; j++)
-        {
-            softs[i][j] = exp(probs[i][j])/denominator[i];
-            //cout << softs[i][j] << ",";
-        }
-        //cout << "]," << endl;
-    }
-
-    float req[100][91];
-    //cout << "[";
-    for (size_t i = 0; i < 100; i++)
-    {
-        //cout << "[";
-        for (size_t j = 0; j < 91; j++)
-        {
-            req[i][j] = softs[i][j];
-            if (i == 20) {
-                //cout << req[i][j] << ",";
-            }
-        }
-        //cout << "]," << endl;
-    }
-    //cout << "]";
-    cout << "[";
+    
+    // Calculate softmax of each item(row-wise) by didving exponent of item by sum of exponents
+    // Ignore 92nd column as it isn't required
+    // Find the highest probablility and it's index
+    float softs[100][91];
     for (size_t i = 0; i < 100; i++)
     {
         float max = 0;
         int index = -1;
         for (size_t j = 0; j < 91; j++)
         {
-            if (req[i][j] >= max) {
-                max = req[i][j];
+            softs[i][j] = exp(probs[i][j])/denominator[i];
+            if (softs[i][j] >= max) {
+                max = softs[i][j];
                 index = j;
             }
         }
-        cout <<  index << ",";
+        if (max > 0.75) {
+            cout << i << ":" << index << "(" << max << ")" << endl;
+        }
     }
-    cout << "]";
 }
