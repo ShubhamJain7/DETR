@@ -8,16 +8,18 @@
 using namespace std;
 using namespace cv;
 
-int main()
-{
+const wchar_t* model_path = L"C:/Users/dell/source/repos/DETR/models/DETRmodel.onnx";
+const string image_path = "C:/Users/dell/source/repos/DETR/test.jpg";
+const float conf_threshold = 0.75;
+
+Mat preprocess_image() {
     // load image to process
     Mat image;
-    image = imread("C:/Users/dell/source/repos/DETR/test.jpg", IMREAD_COLOR);
+    image = imread(image_path, IMREAD_COLOR);
     // if image is an empty matrix
     if (!image.data)
     {
-        cout << "Could not open or find the image" << std::endl;
-        return -1;
+        return image;
     }
 
     // convert image values from int to float
@@ -28,7 +30,7 @@ int main()
     Mat image_resized;
     // resize image to (256x256) to fit model input dimensions
     resize(image, image_resized, Size(256, 256));
-    
+
     // normalize image (values between 0-1)
     Mat image_float;
     image_resized.convertTo(image_float, CV_32FC3, 1.0f / 255.0f, 0);
@@ -51,16 +53,22 @@ int main()
     Mat image_normalized;
     vconcat(channels, image_normalized);
 
+    return image_normalized;
+}
+
+int main()
+{
+    // Get processed image
+    Mat image = preprocess_image();
+    if (!image.data)
+    {
+        cout << "Could not open or find the image" << std::endl;
+        return -1;
+    }
+
     // create ONNX env and sessionOptions objects
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "test");
     Ort::SessionOptions session_options;
-
-    // path to model
-    #ifdef _WIN32
-        const wchar_t* model_path = L"C:/Users/dell/source/repos/DETR/models/DETRmodel.onnx";
-    #else
-        const char* model_path = "C:/Users/dell/source/repos/DETR/models/DETRmodel.onnx";
-    #endif
 
     // create ONNX session
     Ort::Session session(env, model_path, session_options);
@@ -78,7 +86,7 @@ int main()
     // create input tensor
     auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
     size_t input_tensor_size = 256 * 256 * 3;
-    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, reinterpret_cast<float*>(image_normalized.data), input_tensor_size, input_node_dims.data(), 4);
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info, reinterpret_cast<float*>(image.data), input_tensor_size, input_node_dims.data(), 4);
 
     // pass inputs through model and get output
     auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_names, &input_tensor, 1, output_names, 2);
@@ -132,7 +140,7 @@ int main()
             }
         }
         // filter outputs
-        if (max_prob > 0.75) {
+        if (max_prob > conf_threshold) {
             class_ids.push_back(id);
             probabilities.push_back(max_prob);
 
