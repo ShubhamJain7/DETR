@@ -96,13 +96,13 @@ int main()
     size_t idx = 0;
     while (idx < boxes_len) {
         for (size_t i = 0; i < 100; i++) {
-            cout << "[";
+            //cout << "[";
             for (size_t j = 0; j < 4; j++) {
                 boxes[i][j] = bboxes[idx];
-                cout << boxes[i][j] << ",";
+                //cout << boxes[i][j] << ",";
                 idx++;
             }
-            cout << "],\n";
+            //cout << "],\n";
         }
     }
 
@@ -127,20 +127,44 @@ int main()
     // Ignore 92nd column as it isn't required
     // Find the highest probablility and it's index
     float softs[100][91];
-    for (size_t i = 0; i < 100; i++)
-    {
-        float max = 0;
-        int index = -1;
-        for (size_t j = 0; j < 91; j++)
-        {
+    vector<int> indexes;
+    vector<int> class_ids;
+    vector<float> probabilities;
+    for (size_t i = 0; i < 100; i++) {
+        float max_prob = 0;
+        int id = -1;
+        for (size_t j = 0; j < 91; j++) {
             softs[i][j] = exp(probs[i][j])/denominator[i];
-            if (softs[i][j] >= max) {
-                max = softs[i][j];
-                index = j;
+            if (softs[i][j] >= max_prob) {
+                max_prob = softs[i][j];
+                id = j;
             }
         }
-        if (max > 0.75) {
-            //cout << i << ":" << index << "(" << max << ")" << endl;
+        // filter outputs
+        if (max_prob > 0.75) {
+            indexes.push_back(i);
+            class_ids.push_back(id);
+            probabilities.push_back(max_prob);
         }
+    }
+
+    // Select only bounding boxes for filtered scores
+    vector<array<float, 4>> bounding_boxes;
+    for (size_t i = 0; i < indexes.size(); i++) {
+        int val = indexes[i];
+        array<float, 4> box;
+        for (size_t j = 0; j < 4; j++) {
+            box[j] = boxes[val][j];
+        }
+        bounding_boxes.push_back(box);
+    }
+
+    // Display final results
+    for (size_t i = 0; i < indexes.size(); i++) {
+        cout << class_ids[i] << "(" << probabilities[i] << "): [";
+        for (size_t j = 0; j < 4; j++) {
+            cout << bounding_boxes[i][j] << ",";
+        }
+        cout << "]\n";
     }
 }
