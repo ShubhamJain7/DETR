@@ -12,16 +12,7 @@ const wchar_t* model_path = L"C:/Users/dell/source/repos/DETR/models/DETRmodel.o
 const string image_path = "C:/Users/dell/source/repos/DETR/test.jpg";
 const float conf_threshold = 0.75;
 
-Mat preprocess_image() {
-    // load image to process
-    Mat image;
-    image = imread(image_path, IMREAD_COLOR);
-    // if image is an empty matrix
-    if (!image.data)
-    {
-        return image;
-    }
-
+Mat preprocess_image(Mat image) {
     // convert image values from int to float
     image.convertTo(image, CV_32FC3);
     // Change image format from BGR to RGB
@@ -58,13 +49,22 @@ Mat preprocess_image() {
 
 int main()
 {
-    // Get processed image
-    Mat image = preprocess_image();
-    if (!image.data)
+    // load image to process
+    Mat im;
+    im = imread(image_path, IMREAD_COLOR);
+    // if image is an empty matrix
+    if (!im.data)
     {
-        cout << "Could not open or find the image" << std::endl;
+        cout << "Could not open or find the image" << endl;
         return -1;
     }
+
+    // get image height and width
+    int height = im.rows;
+    int width = im.cols;
+
+    // get processed image
+    Mat image = preprocess_image(im);
 
     // create ONNX env and sessionOptions objects
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "test");
@@ -105,7 +105,7 @@ int main()
     float boxes[100][4];
     size_t probs_index = 0;
     size_t boxes_index = 0;
-    float denominator[100];
+    float denominators[100];
     while (probs_index < probs_len) {
         for (size_t i = 0; i < 100; i++) {
             float val = 0;
@@ -119,7 +119,7 @@ int main()
                     ++boxes_index;
                 }
             }
-            denominator[i] = val;
+            denominators[i] = val;
         }
     }
     
@@ -128,12 +128,12 @@ int main()
     // find the highest probablility, it's index in the row and the corresponding bounding box
     vector<int> class_ids;
     vector<float> probabilities;
-    vector<array<float, 4>> bounding_boxes;
+    vector<array<int, 4>> bounding_boxes;
     for (size_t i = 0; i < 100; i++) {
         float max_prob = 0;
         int id = -1;
         for (size_t j = 0; j < 91; j++) {
-            float val = exp(probs[i][j])/denominator[i];
+            float val = exp(probs[i][j])/denominators[i];
             if (val >= max_prob) {
                 max_prob = val;
                 id = j;
@@ -148,7 +148,15 @@ int main()
             for (size_t k = 0; k < 4; k++) {
                 box[k] = boxes[i][k];
             }
-            bounding_boxes.push_back(box);
+
+            // convert bounding box from cx-w-cy-h format to x1y1x2y2 format and scale to original image dimensions
+            array<int, 4> scaled_box = {
+                (int)((box[0] - 0.5 * box[2]) * width),
+                (int)((box[1] - 0.5 * box[3]) * height),
+                (int)((box[0] + 0.5 * box[2]) * width),
+                (int)((box[1] + 0.5 * box[3]) * height)
+            };
+            bounding_boxes.push_back(scaled_box);
         }
     }
 
