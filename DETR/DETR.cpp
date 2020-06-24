@@ -84,20 +84,37 @@ int main()
     auto output_tensors = session.Run(Ort::RunOptions{ nullptr }, input_names, &input_tensor, 1, output_names, 2);
 
     auto scores = output_tensors[0].GetTensorMutableData<float>();
+    auto bboxes = output_tensors[1].GetTensorMutableData<float>();
 
-    // Get length of output
-    auto typeInfo = output_tensors[0].GetTensorTypeAndShapeInfo();
-    size_t len = typeInfo.GetElementCount();
+    // Get length of outputs
+    auto probs_typeInfo = output_tensors[0].GetTensorTypeAndShapeInfo();
+    size_t probs_len = probs_typeInfo.GetElementCount();
+    auto boxes_typeInfo = output_tensors[1].GetTensorTypeAndShapeInfo();
+    size_t boxes_len = boxes_typeInfo.GetElementCount();
+
+    float boxes[100][4];
+    size_t idx = 0;
+    while (idx < boxes_len) {
+        for (size_t i = 0; i < 100; i++) {
+            cout << "[";
+            for (size_t j = 0; j < 4; j++) {
+                boxes[i][j] = bboxes[idx];
+                cout << boxes[i][j] << ",";
+                idx++;
+            }
+            cout << "],\n";
+        }
+    }
 
     // store outputs in a 2d array for easier access and processing
     // calculate and store sum of exponents for each row to be used as denominator for apploying the softmax function
     float probs[100][92];
     size_t index = 0;
     float denominator[100];
-    while (index < len) {
-        for (int i = 0; i < 100; i++) {
+    while (index < probs_len) {
+        for (size_t i = 0; i < 100; i++) {
             float val = 0;
-            for (int j = 0; j < 92; j++) {
+            for (size_t j = 0; j < 92; j++) {
                 probs[i][j] = scores[index];
                 val += exp(probs[i][j]);
                 ++index;
@@ -123,7 +140,7 @@ int main()
             }
         }
         if (max > 0.75) {
-            cout << i << ":" << index << "(" << max << ")" << endl;
+            //cout << i << ":" << index << "(" << max << ")" << endl;
         }
     }
 }
