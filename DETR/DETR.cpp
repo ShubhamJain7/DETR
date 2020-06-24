@@ -12,6 +12,15 @@ const wchar_t* model_path = L"C:/Users/dell/source/repos/DETR/models/DETRmodel.o
 const string image_path = "C:/Users/dell/source/repos/DETR/test.jpg";
 const float conf_threshold = 0.75;
 
+struct Detection {
+    int classId;
+    float probability;
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+};
+
 Mat preprocess_image(Mat image) {
     // convert image values from int to float
     image.convertTo(image, CV_32FC3);
@@ -126,9 +135,7 @@ int main()
     // calculate softmax of each item(row-wise) by didving exponent of item by sum of exponents
     // ignore 92nd column as it isn't required
     // find the highest probablility, it's index in the row and the corresponding bounding box
-    vector<int> class_ids;
-    vector<float> probabilities;
-    vector<array<int, 4>> bounding_boxes;
+    vector<Detection> detected_objects;
     for (size_t i = 0; i < 100; i++) {
         float max_prob = 0;
         int id = -1;
@@ -141,8 +148,9 @@ int main()
         }
         // filter outputs
         if (max_prob > conf_threshold) {
-            class_ids.push_back(id);
-            probabilities.push_back(max_prob);
+            Detection d;
+            d.classId = id;
+            d.probability = max_prob;
 
             array<float, 4> box;
             for (size_t k = 0; k < 4; k++) {
@@ -150,22 +158,19 @@ int main()
             }
 
             // convert bounding box from cx-w-cy-h format to x1y1x2y2 format and scale to original image dimensions
-            array<int, 4> scaled_box = {
-                (int)((box[0] - 0.5 * box[2]) * width),
-                (int)((box[1] - 0.5 * box[3]) * height),
-                (int)((box[0] + 0.5 * box[2]) * width),
-                (int)((box[1] + 0.5 * box[3]) * height)
-            };
-            bounding_boxes.push_back(scaled_box);
+            d.x1 = (int)((box[0] - 0.5 * box[2]) * width);
+            d.y1 = (int)((box[1] - 0.5 * box[3]) * height);
+            d.x2 = (int)((box[0] + 0.5 * box[2]) * width);
+            d.y2 = (int)((box[1] + 0.5 * box[3]) * height);
+
+            detected_objects.push_back(d);
         }
     }
 
     // display final results
-    for (size_t i = 0; i < class_ids.size(); i++) {
-        cout << class_ids[i] << "(" << probabilities[i] << "): [";
-        for (size_t j = 0; j < 4; j++) {
-            cout << bounding_boxes[i][j] << ",";
-        }
-        cout << "]\n";
+    for (size_t i = 0; i < detected_objects.size(); i++) {
+        Detection d = detected_objects[i];
+        cout << d.classId << "(" << d.probability << "):"; 
+        cout << "[(" << d.x1 << "," << d.y1 << "),(" << d.x2 << "," << d.y2 << ")]" << endl;
     }
 }
